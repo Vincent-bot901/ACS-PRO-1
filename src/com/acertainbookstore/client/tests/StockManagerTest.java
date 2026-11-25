@@ -470,6 +470,112 @@ public class StockManagerTest {
 	}
 
 	/**
+	 * Tests that getBooksInDemand returns an empty list when no books have
+	 * experienced a sale miss.
+	 *
+	 * @throws BookStoreException
+	 *             the book store exception
+	 */
+	@Test
+	public void testGetBooksInDemandInitiallyEmpty() throws BookStoreException {
+		List<StockBook> booksInDemand = storeManager.getBooksInDemand();
+		assertEquals(0, booksInDemand.size());
+	}
+
+	/**
+	 * Tests that attempting to buy more copies than available records a sale
+	 * miss and returns that book via getBooksInDemand with the expected miss count.
+	 *
+	 * @throws BookStoreException
+	 *             the book store exception
+	 */
+	@Test
+	public void testGetBooksInDemandAfterSaleMiss() throws BookStoreException {
+		int requestedCopies = NUM_COPIES + 2;
+		Set<BookCopy> booksToBuy = new HashSet<BookCopy>();
+		booksToBuy.add(new BookCopy(TEST_ISBN, requestedCopies));
+
+		try {
+			client.buyBooks(booksToBuy);
+			fail("Expected BookStoreException due to insufficient copies");
+		} catch (BookStoreException ex) {
+			// Expected exception when stock is insufficient
+		}
+
+		List<StockBook> booksInDemand = storeManager.getBooksInDemand();
+		assertEquals(1, booksInDemand.size());
+
+		StockBook demandBook = booksInDemand.get(0);
+		assertEquals(TEST_ISBN.intValue(), demandBook.getISBN());
+		assertEquals(requestedCopies - NUM_COPIES, demandBook.getNumSaleMisses());
+	}
+
+	/**
+	 * Tests that replenishing stock via addCopies resets numSaleMisses to 0
+	 * and removes the book from getBooksInDemand.
+	 *
+	 * @throws BookStoreException
+	 *             the book store exception
+	 */
+	@Test
+	public void testGetBooksInDemandResetAfterAddCopies() throws BookStoreException {
+		Set<BookCopy> booksToBuy = new HashSet<BookCopy>();
+		booksToBuy.add(new BookCopy(TEST_ISBN, NUM_COPIES + 1));
+
+		try {
+			client.buyBooks(booksToBuy);
+			fail("Expected BookStoreException due to insufficient copies");
+		} catch (BookStoreException ex) {
+			// Expected sale miss
+		}
+
+		assertEquals(1, storeManager.getBooksInDemand().size());
+
+		// Adding even 1 copy resets numSaleMisses to 0 in BookStoreBook.addCopies
+		Set<BookCopy> copiesToAdd = new HashSet<BookCopy>();
+		copiesToAdd.add(new BookCopy(TEST_ISBN, 1));
+		storeManager.addCopies(copiesToAdd);
+
+		List<StockBook> booksInDemand = storeManager.getBooksInDemand();
+		assertEquals(0, booksInDemand.size());
+	}
+
+	/**
+	 * Tests that getBooksInDemand filters accurately when the store holds both
+	 * in-demand and non-in-demand books, and that modifying the returned list
+	 * does not mutate internal store state.
+	 *
+	 * @throws BookStoreException
+	 *             the book store exception
+	 */
+	@Test
+	public void testGetBooksInDemandMultipleBooksAndIsolation() throws BookStoreException {
+		int secondIsbn = TEST_ISBN + 1;
+		Set<StockBook> extraBooks = new HashSet<StockBook>();
+		extraBooks.add(new ImmutableStockBook(secondIsbn, "Distributed Systems", "Tanenbaum",
+				(float) 45, NUM_COPIES, 0, 0, 0, false));
+		storeManager.addBooks(extraBooks);
+
+		// Trigger a sale miss only on secondIsbn
+		Set<BookCopy> booksToBuy = new HashSet<BookCopy>();
+		booksToBuy.add(new BookCopy(secondIsbn, NUM_COPIES + 3));
+		try {
+			client.buyBooks(booksToBuy);
+			fail("Expected BookStoreException due to insufficient copies");
+		} catch (BookStoreException ex) {
+			// Expected
+		}
+
+		List<StockBook> booksInDemand = storeManager.getBooksInDemand();
+		assertEquals(1, booksInDemand.size());
+		assertEquals(secondIsbn, booksInDemand.get(0).getISBN());
+
+		// Verify mutating the returned list does not affect subsequent calls
+		booksInDemand.clear();
+		assertEquals(1, storeManager.getBooksInDemand().size());
+	}
+
+	/**
 	 * Tear down after class.
 	 *
 	 * @throws BookStoreException

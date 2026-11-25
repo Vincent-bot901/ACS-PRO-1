@@ -9,6 +9,8 @@ public enum BookStoreMessageTag {
 	/** The tag for the add book message. */
 	ADDBOOKS,
 
+	GETBOOKSINDEMAND, 
+
 	/** The tag for the list books message. */
 	LISTBOOKS,
 
