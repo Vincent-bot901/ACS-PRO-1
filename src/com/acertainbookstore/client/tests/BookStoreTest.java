@@ -14,6 +14,7 @@ import org.junit.Test;
 
 import com.acertainbookstore.business.Book;
 import com.acertainbookstore.business.BookCopy;
+import com.acertainbookstore.business.BookRating;
 import com.acertainbookstore.business.CertainBookStore;
 import com.acertainbookstore.business.ImmutableStockBook;
 import com.acertainbookstore.business.StockBook;
@@ -364,4 +365,132 @@ public class BookStoreTest {
 			((StockManagerHTTPProxy) storeManager).stop();
 		}
 	}
+
+	/**
+	 * Tests valid book ratings and average rating calculation.
+	 */
+	@Test
+	public void testRateBooksValid() throws BookStoreException {
+		addBooks(TEST_ISBN + 1, NUM_COPIES);
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 4));
+		ratings.add(new BookRating(TEST_ISBN + 1, 5));
+		client.rateBooks(ratings);
+
+		// Rate TEST_ISBN a second time to verify cumulative average
+		Set<BookRating> secondRating = new HashSet<BookRating>();
+		secondRating.add(new BookRating(TEST_ISBN, 2));
+		client.rateBooks(secondRating);
+
+		Set<Integer> isbns = new HashSet<Integer>();
+		isbns.add(TEST_ISBN);
+		isbns.add(TEST_ISBN + 1);
+		List<StockBook> books = storeManager.getBooksByISBN(isbns);
+
+		for (StockBook book : books) {
+			if (book.getISBN() == TEST_ISBN) {
+				assertEquals(2, book.getNumTimesRated());
+				assertEquals(6, book.getTotalRating());
+				assertEquals(3.0f, book.getAverageRating(), 0.001f);
+			} else if (book.getISBN() == TEST_ISBN + 1) {
+				assertEquals(1, book.getNumTimesRated());
+				assertEquals(5, book.getTotalRating());
+				assertEquals(5.0f, book.getAverageRating(), 0.001f);
+			}
+		}
+	}
+
+	/**
+	 * Tests all-or-nothing rollback when a rating set contains an out-of-range rating.
+	 */
+	@Test
+	public void testRateBooksInvalidRating() throws BookStoreException {
+		addBooks(TEST_ISBN + 1, NUM_COPIES);
+		List<StockBook> booksInStorePreTest = storeManager.getBooks();
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 5));     // valid
+		ratings.add(new BookRating(TEST_ISBN + 1, 6)); // invalid (> 5)
+
+		try {
+			client.rateBooks(ratings);
+			fail();
+		} catch (BookStoreException ex) {
+			// Expected
+		}
+
+		List<StockBook> booksInStorePostTest = storeManager.getBooks();
+		assertTrue(booksInStorePreTest.containsAll(booksInStorePostTest)
+				&& booksInStorePreTest.size() == booksInStorePostTest.size());
+	}
+
+	/**
+	 * Tests all-or-nothing rollback when a rating set contains a non-existing ISBN.
+	 */
+	@Test
+	public void testRateBooksNonExistingISBN() throws BookStoreException {
+		List<StockBook> booksInStorePreTest = storeManager.getBooks();
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 4));  // valid
+		ratings.add(new BookRating(999999, 4));     // invalid (not in store)
+
+		try {
+			client.rateBooks(ratings);
+			fail();
+		} catch (BookStoreException ex) {
+			// Expected
+		}
+
+		List<StockBook> booksInStorePostTest = storeManager.getBooks();
+		assertTrue(booksInStorePreTest.containsAll(booksInStorePostTest)
+				&& booksInStorePreTest.size() == booksInStorePostTest.size());
+	}
+
+	/**
+	 * Tests retrieving top-k rated books in descending rating order.
+	 */
+	@Test
+	public void testGetTopRatedBooksValid() throws BookStoreException {
+		addBooks(TEST_ISBN + 1, NUM_COPIES);
+		addBooks(TEST_ISBN + 2, NUM_COPIES);
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 2));
+		ratings.add(new BookRating(TEST_ISBN + 1, 5));
+		ratings.add(new BookRating(TEST_ISBN + 2, 4));
+		client.rateBooks(ratings);
+
+		// Top 2 should be TEST_ISBN + 1 (avg 5) followed by TEST_ISBN + 2 (avg 4)
+		List<Book> topTwo = client.getTopRatedBooks(2);
+		assertEquals(2, topTwo.size());
+		assertEquals(TEST_ISBN + 1, topTwo.get(0).getISBN());
+		assertEquals(TEST_ISBN + 2, topTwo.get(1).getISBN());
+
+		// Requesting more books than exist in store returns all books sorted
+		List<Book> allTop = client.getTopRatedBooks(10);
+		assertEquals(3, allTop.size());
+		assertEquals(TEST_ISBN + 1, allTop.get(0).getISBN());
+		assertEquals(TEST_ISBN + 2, allTop.get(1).getISBN());
+		assertEquals(TEST_ISBN, allTop.get(2).getISBN());
+
+		// Requesting 0 books returns an empty list
+		assertTrue(client.getTopRatedBooks(0).isEmpty());
+	}
+
+	/**
+	 * Tests that negative numBooks throws a BookStoreException.
+	 */
+	@Test
+	public void testGetTopRatedBooksNegativeNumBooks() throws BookStoreException {
+		try {
+			client.getTopRatedBooks(-1);
+			fail();
+		} catch (BookStoreException ex) {
+			// Expected
+		}
+	}
+
+
 }

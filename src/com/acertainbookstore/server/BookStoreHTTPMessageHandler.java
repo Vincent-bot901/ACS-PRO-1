@@ -16,6 +16,7 @@ import com.acertainbookstore.business.BookCopy;
 import com.acertainbookstore.business.BookEditorPick;
 import com.acertainbookstore.business.CertainBookStore;
 import com.acertainbookstore.business.StockBook;
+import com.acertainbookstore.business.BookRating;
 import com.acertainbookstore.utils.BookStoreKryoSerializer;
 import com.acertainbookstore.interfaces.BookStoreSerializer;
 import com.acertainbookstore.utils.BookStoreConstants;
@@ -24,6 +25,7 @@ import com.acertainbookstore.utils.BookStoreMessageTag;
 import com.acertainbookstore.utils.BookStoreResponse;
 import com.acertainbookstore.utils.BookStoreUtility;
 import com.esotericsoftware.kryo.io.Input;
+
 
 /**
  * {@link BookStoreHTTPMessageHandler} implements the message handler class
@@ -127,6 +129,14 @@ public class BookStoreHTTPMessageHandler extends AbstractHandler {
 				getBooksInDemand(response);
 				break;
 
+			case RATEBOOKS:
+				rateBooks(request, response);
+				break;
+
+			case GETTOPRATEDBOOKS:
+				getTopRatedBooks(request, response);
+				break;
+
 			default:
 				System.err.println("Unsupported message tag.");
 				break;
@@ -136,6 +146,40 @@ public class BookStoreHTTPMessageHandler extends AbstractHandler {
 		// Mark the request as handled so that the HTTP response can be sent
 		baseRequest.setHandled(true);
 	}
+
+	@SuppressWarnings("unchecked")
+	private void rateBooks(HttpServletRequest request, HttpServletResponse response) throws IOException {
+		byte[] serializedRequestContent = getSerializedRequestContent(request);
+
+		Set<BookRating> bookRatings = (Set<BookRating>) serializer.get().deserialize(serializedRequestContent);
+		BookStoreResponse bookStoreResponse = new BookStoreResponse();
+
+		try {
+			myBookStore.rateBooks(bookRatings);
+		} catch (BookStoreException ex) {
+			bookStoreResponse.setException(ex);
+		}
+
+		byte[] serializedResponseContent = serializer.get().serialize(bookStoreResponse);
+		response.getOutputStream().write(serializedResponseContent);
+	}
+
+	private void getTopRatedBooks(HttpServletRequest request, HttpServletResponse response) throws IOException {
+		String numBooksString = URLDecoder.decode(request.getParameter(BookStoreConstants.BOOK_NUM_PARAM),
+				StandardCharsets.UTF_8);
+		BookStoreResponse bookStoreResponse = new BookStoreResponse();
+
+		try {
+			int numBooks = BookStoreUtility.convertStringToInt(numBooksString);
+			bookStoreResponse.setList(myBookStore.getTopRatedBooks(numBooks));
+		} catch (BookStoreException ex) {
+			bookStoreResponse.setException(ex);
+		}
+
+		byte[] serializedResponseContent = serializer.get().serialize(bookStoreResponse);
+		response.getOutputStream().write(serializedResponseContent);
+	}
+
 
 	/**
 	 * Gets the stock books by ISBN.

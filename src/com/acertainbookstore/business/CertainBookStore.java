@@ -88,6 +88,17 @@ public class CertainBookStore implements BookStore, StockManager {
 		validateISBNInStock(isbn); // Check if the book has valid ISBN and in stock
 	}
 
+	private synchronized void validate(BookRating bookRating) throws BookStoreException {
+		int isbn = bookRating.getISBN();
+		int rating = bookRating.getRating();
+
+		validateISBNInStock(isbn);
+
+		if (BookStoreUtility.isInvalidRating(rating)) {
+			throw new BookStoreException("Rating " + rating + BookStoreConstants.INVALID);
+		}
+	}
+
 	private synchronized void validateISBNInStock(Integer ISBN) throws BookStoreException {
 		if (BookStoreUtility.isInvalidISBN(ISBN)) { // Check if the book has valid ISBN
 			throw new BookStoreException(BookStoreConstants.ISBN + ISBN + BookStoreConstants.INVALID);
@@ -317,7 +328,16 @@ public class CertainBookStore implements BookStore, StockManager {
 	 */
 	@Override
 	public synchronized List<Book> getTopRatedBooks(int numBooks) throws BookStoreException {
-		throw new BookStoreException();
+		if (numBooks < 0) {
+			throw new BookStoreException("numBooks = " + numBooks + ", but it must be positive");
+		}
+
+		return bookMap.values().stream()
+				.filter(book -> book.getNumTimesRated() > 0)
+				.sorted((b1, b2) -> Float.compare(b2.getAverageRating(), b1.getAverageRating()))
+				.limit(numBooks)
+				.map(BookStoreBook::immutableBook)
+				.collect(Collectors.toList());
 	}
 
 	/*
@@ -340,7 +360,23 @@ public class CertainBookStore implements BookStore, StockManager {
 	 */
 	@Override
 	public synchronized void rateBooks(Set<BookRating> bookRating) throws BookStoreException {
-		throw new BookStoreException();
+		if (bookRating == null) {
+			throw new BookStoreException(BookStoreConstants.NULL_INPUT);
+		}
+
+		// Pass 1: Validate all ratings and ISBNs before mutating anything (all-or-nothing)
+		for (BookRating rating : bookRating) {
+			if (rating == null) {
+				throw new BookStoreException(BookStoreConstants.NULL_INPUT);
+			}
+			validate(rating);
+		}
+
+		// Pass 2: Apply all ratings
+		for (BookRating rating : bookRating) {
+			BookStoreBook book = bookMap.get(rating.getISBN());
+			book.addRating(rating.getRating());
+		}
 	}
 
 	/*
