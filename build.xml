@@ -35,7 +35,7 @@
       </java>
     </target>
     <target name="test">
-      <parallel>
+      <parallel failonany="true">
           <if>
             <equals arg1="${localtest}" arg2="false"/>
             <then>
@@ -49,13 +49,14 @@
           </if>
         <sequential>
           <sleep seconds="2"/>
-          <junit haltonfailure="no" showoutput="true" fork="yes">
+          <junit haltonfailure="no" showoutput="true" fork="yes" failureproperty="tests.failed" errorproperty="tests.failed">
             <test name="com.acertainbookstore.client.tests.BookStoreTest" haltonfailure="no" />
             <test name="com.acertainbookstore.client.tests.StockManagerTest" haltonfailure="no" />
             <classpath refid="acertainbookstore.classpath"/>
             <jvmarg line="-Dlocaltest=${localtest}"/>
             <formatter usefile="false" type="brief"/>
           </junit>
+          <fail if="tests.failed" message="JUnit tests failed."/>
           <if>
             <equals arg1="${localtest}" arg2="false"/>
             <then>

@@ -12,6 +12,7 @@ import com.acertainbookstore.interfaces.BookStoreSerializer;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.esotericsoftware.kryo.util.DefaultInstantiatorStrategy;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 /**
@@ -41,6 +42,7 @@ public final class BookStoreKryoSerializer implements BookStoreSerializer {
 		binaryStream.register(com.acertainbookstore.business.BookEditorPick.class);
 		binaryStream.register(com.acertainbookstore.business.ImmutableBook.class);
 		binaryStream.register(com.acertainbookstore.business.BookRating.class);
+		binaryStream.register(BookStoreException.class);
 	}
 
 	/*

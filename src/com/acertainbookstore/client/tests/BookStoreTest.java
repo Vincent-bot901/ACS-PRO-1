@@ -143,6 +143,7 @@ public class BookStoreTest {
 		StockBook bookInList = listBooks.get(0);
 		StockBook addedBook = getDefaultBook();
 
+		assertEquals(0, bookInList.getNumCopies());
 		assertTrue(bookInList.getISBN() == addedBook.getISBN() && bookInList.getTitle().equals(addedBook.getTitle())
 				&& bookInList.getAuthor().equals(addedBook.getAuthor()) && bookInList.getPrice() == addedBook.getPrice()
 				&& bookInList.getNumSaleMisses() == addedBook.getNumSaleMisses()
@@ -417,12 +418,16 @@ public class BookStoreTest {
 			client.rateBooks(ratings);
 			fail();
 		} catch (BookStoreException ex) {
-			// Expected
+			assertEquals("Rating 6" + BookStoreConstants.INVALID, ex.getMessage());
 		}
 
 		List<StockBook> booksInStorePostTest = storeManager.getBooks();
 		assertTrue(booksInStorePreTest.containsAll(booksInStorePostTest)
 				&& booksInStorePreTest.size() == booksInStorePostTest.size());
+		for (StockBook book : booksInStorePostTest) {
+			assertEquals(0, book.getTotalRating());
+			assertEquals(0, book.getNumTimesRated());
+		}
 	}
 
 	/**
@@ -440,12 +445,16 @@ public class BookStoreTest {
 			client.rateBooks(ratings);
 			fail();
 		} catch (BookStoreException ex) {
-			// Expected
+			assertEquals(BookStoreConstants.ISBN + 999999 + BookStoreConstants.NOT_AVAILABLE, ex.getMessage());
 		}
 
 		List<StockBook> booksInStorePostTest = storeManager.getBooks();
 		assertTrue(booksInStorePreTest.containsAll(booksInStorePostTest)
 				&& booksInStorePreTest.size() == booksInStorePostTest.size());
+		for (StockBook book : booksInStorePostTest) {
+			assertEquals(0, book.getTotalRating());
+			assertEquals(0, book.getNumTimesRated());
+		}
 	}
 
 	/**
@@ -488,7 +497,7 @@ public class BookStoreTest {
 			client.getTopRatedBooks(-1);
 			fail();
 		} catch (BookStoreException ex) {
-			// Expected
+			assertEquals("numBooks = -1, but it must be positive", ex.getMessage());
 		}
 	}
 
