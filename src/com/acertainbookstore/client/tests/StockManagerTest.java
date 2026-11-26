@@ -238,16 +238,12 @@ public class StockManagerTest {
 		Set<Integer> testISBNList = new HashSet<Integer>();
 		testISBNList.add(TEST_ISBN);
 		List<StockBook> listBooks = storeManager.getBooksByISBN(testISBNList);
-		//assertTrue(listBooks.size() == 1);
+		assertEquals(1, listBooks.size());
 
 		StockBook bookInList = listBooks.get(0);
 		StockBook addedBook = getDefaultBook();
 
-		//assertTrue(bookInList.getNumCopies() == addedBook.getNumCopies() + copies_to_add);
-
-		// Painful hack since we want to check all fields except num copies on
-		// an immutable object
-		assertTrue(true);
+		assertEquals(addedBook.getNumCopies() + copies_to_add, bookInList.getNumCopies());
 	}
 
 	/**
